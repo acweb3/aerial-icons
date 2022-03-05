@@ -5,5 +5,9 @@ export const Button: React.FC<React.ComponentPropsWithoutRef<"button">> = ({
 	children,
 	...props
 }) => {
-	return <S.ButtonContainer {...props}>{children}</S.ButtonContainer>;
+	return (
+		<S.ButtonContainer tabIndex={0} {...props}>
+			{children}
+		</S.ButtonContainer>
+	);
 };

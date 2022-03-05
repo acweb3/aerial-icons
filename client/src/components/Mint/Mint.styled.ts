@@ -11,13 +11,23 @@ export const Error = styled.span`
 	color: #f00;
 	font-style: italic;
 
-	margin-left: 24px;
+	margin-top: 8px;
 `;
 
-export const Container = styled.div`
+export const Mint = styled.div`
+	width: 100%;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+
+	margin-top: 12px;
+
 	& > a {
 		margin-top: 16px;
+		margin-bottom: 12px;
 	}
+
 	${breakpoints.medium`
 		& > a {
 			margin-top: 0;

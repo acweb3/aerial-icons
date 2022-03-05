@@ -31,19 +31,10 @@ export const breakpoints: BreakpointsCSSMap = Object.entries(
         ...accumulator,
         [key]: (...args: any[]): FlattenSimpleInterpolation =>
             css`
-                @media (max-width: ${breakpoint}) {
+                @media (min-width: ${breakpoint}) {
                     ${css(args[0], ...args.slice(1))}
                 }
-            `,
-        min: {
-            ...(accumulator.min || {}),
-            [key]: (...args: any[]): FlattenSimpleInterpolation =>
-                css`
-                    @media (min-width: ${breakpoint}) {
-                        ${css(args[0], ...args.slice(1))}
-                    }
-                `,
-        },
+        `
     }),
     {} as BreakpointsCSSMap
 );

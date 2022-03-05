@@ -1,8 +1,10 @@
 import styled, { createGlobalStyle } from 'styled-components';
 
 export const SiteWrapper = styled.div`
-    max-width: 100vw;
-    max-height: 100vh;
+    width: 100vw;
+    height: 100vh;
+    color: #FFF;
+    background: #000;
 `;
 
 export const GlobalStyle = createGlobalStyle`
@@ -21,7 +23,7 @@ export const GlobalStyle = createGlobalStyle`
     }
 
     * {
-        font-family: Karla, sans-serif;
+        font-family: 'Work Sans', sans-serif;
     }
 
     /*

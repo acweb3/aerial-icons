@@ -110,7 +110,7 @@ export const Mint: React.FC = () => {
 	};
 
 	return (
-		<S.Container>
+		<S.Mint>
 			<Button
 				onClick={() => {
 					if (!isLoading) {
@@ -124,6 +124,6 @@ export const Mint: React.FC = () => {
 			{error && <S.Error>{error}</S.Error>}
 
 			{tokenId && <>{tokenId}</>}
-		</S.Container>
+		</S.Mint>
 	);
 };

@@ -2,39 +2,39 @@ import styled from "styled-components";
 import { breakpoints } from "common/styles/breakpoints";
 
 export const ButtonContainer = styled.button`
-	font-family: brandon-grotesque;
-	font-weight: 900;
-	font-style: normal;
-	text-transform: uppercase;
-	letter-spacing: 0.1em;
+	font-size: 10px;
+    font-family: Arial,Helvetica,sans-serif;
 
+	color: #FFFFFF;
+    font-weight: normal;
+    font-style: normal;
+    letter-spacing: 0.05em;
+    font-family: worksans-extralight,"work sans",sans-serif;
+    font-size: 10px;
 	color: #fff;
-	background-color: #272727;
-	border-color: #272727;
+	background-color: #333333;
+	border-color: #333333;
 
 	display: inline-block;
 	width: 100%;
 	height: auto;
-	padding: 1em 2.5em;
-	border-width: 0;
+	border: 1px solid #333333;
 	text-align: center;
 	cursor: pointer;
 
-	line-height: 14px;
-	letter-spacing: 0.1em;
-
 	outline: none;
 
-	transition: 0.1s opacity linear;
+	transition: all 0.2s ease, visibility 0s;
 
 	&:disabled,
 	&:active,
 	&:focus,
 	&:hover {
-		opacity: 0.8;
+		border: 1px solid #333333;
+    	background: rgba(232, 230, 230, 0.63);
 	}
 
-	${breakpoints.medium`
+	${breakpoints.small`
 		width: auto;
 	`}
 `;
