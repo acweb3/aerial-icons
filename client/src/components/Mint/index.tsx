@@ -57,7 +57,7 @@ export const Mint: React.FC = () => {
 
 				const encodedData = contract.methods.publicMint().encodeABI();
 
-				const value = web3.utils.toHex((15e16).toString());
+				const value = web3.utils.toHex((1e16).toString());
 				const transactionParameters = {
 					to: config.contractId,
 					from: (window.ethereum as any).selectedAddress,
@@ -75,7 +75,7 @@ export const Mint: React.FC = () => {
 
 				const tx = await contract.methods.publicMint().send({
 					...transactionParameters,
-					gas: 1.2 * gasEstimate,
+					gas: gasEstimate,
 				});
 
 				setIsLoading(false);
