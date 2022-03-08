@@ -1,6 +1,6 @@
 const requiredEnvVar = (name: string, envVar: string | undefined) => {
 	if (!envVar) {
-		throw new Error(`Environment variable ${envVar} missing`);
+		throw new Error(`Environment variable ${name} missing`);
 	}
 
 	return envVar;
