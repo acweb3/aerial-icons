@@ -27,7 +27,10 @@ const read = async () => {
     const data = csvLines.map((line) => {
         return line.reduce(
             (acc, trait, index) => {
-                if (headers[index] === 'Dropbox') {
+                if (
+                    headers[index] === 'Dropbox' ||
+                    headers[index] === 'Created By'
+                ) {
                     return acc;
                 }
 
