@@ -1,30 +1,54 @@
 // SPDX-License-Identifier: SPDX-License
 pragma solidity ^0.8.6;
 
+import "hardhat/console.sol";
 import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import "@openzeppelin/contracts/utils/Counters.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
-import "@openzeppelin/contracts/security/Pausable.sol";
 
 struct FlightPass {
 	bool claimed;
 	bool exists;
 }
 
-contract AerialIcons is ERC721, Ownable, Pausable {
-	address public sweetCooper = 0x35FB16Db88Bd1A37EFe58E4A936456c15065f713; // a⚡️c gnosis safe
-	address private sweetAndy = 0x21868fCb0D4b262F72e4587B891B4Cf081232726;
+struct Hookup {
+	bool exists;
+	uint256 price;
+}
+
+struct HookupList {
+	mapping(address => Hookup) addressPriceMapping;
+	uint256 addressCount;
+}
+
+struct ReserveList {
+	mapping(address => bool) addressMapping;
+	uint256 addressCount;
+}
+
+contract AerialIcons is ERC721, Ownable {
+	address public sweetAndy = 0xBE7B3DB607525EA25956B4d28d6e552967225622;
 
 	string public baseURI;
 	string public boardingPassURI;
 
-	uint128 private dropCount = 10;
+	uint128 public revealIndex = 0;
+	uint128 public dropCount = 0;
+	uint128 public dropSize = 0;
 	uint128 private constant MAX_SUPPLY = 100; // Max supply
+	uint256 public presalePrice = 10000000000000000; // 0.01 eth test price
 	uint256 public listPrice = 10000000000000000; // 0.01 eth test price
-	uint256 public revealIndex = 0;
+
 	mapping(uint256 => FlightPass) private flightPassMap; // mapping for winning flight path indexes
-	
-	address[] private premintAddresses;
+	mapping(uint256 => string) private flightPassRedemptionMap; // mapping for winning flight path indexes
+
+	ReserveList private presale;
+	ReserveList private allowList;
+	HookupList private hookup;
+
+	uint128 public currentDropReserveCount = 0;
+	uint128 public currentDropReserveIndex = 0;
+	mapping(uint128 => mapping(address => bool)) public currentDropReserve;
 
 	// Keep track of state
 	using Counters for Counters.Counter;
@@ -32,29 +56,72 @@ contract AerialIcons is ERC721, Ownable, Pausable {
 	Counters.Counter private flightPassCounter;
 
 	/**
-	 * A bit wacky, but artist addresses and tokenIds are parallel arrays that
-	 * compose into matching key-value pairs within premints.
-	 *
 	 * @param _baseURI base uri for tokens
+	 * @param _presaleAddresses - list of presale addresses
+	 * @param _allowListAddresses - list of allow list addresses
 	 */
 	constructor(
-		string memory _baseURI
-
+		string memory _baseURI,
+		address[] memory _presaleAddresses,
+		address[] memory _allowListAddresses,
+		uint256[] memory _flightPassIndexes
 	) ERC721("AerialIcons", "AerialIcons") {
 		baseURI = _baseURI;
+
+		setPresaleAddresses(_presaleAddresses);
+		setAllowListAddresses(_allowListAddresses);
+
+		for (uint128 i = 0; i < _flightPassIndexes.length; i++) {
+			flightPassMap[_flightPassIndexes[i]] = FlightPass({
+				claimed: false,
+				exists: true
+			});
+		}
 	}
 
 	// General contract state
 	/*------------------------------------*/
 
-	function resetDropCount(uint128 _dropCount) public onlyOwner {
+	function reserveForCurrentDrop(address _address) public onlyOwner {
+		currentDropReserve[currentDropReserveIndex][_address] = true;
+		currentDropReserveCount = currentDropReserveCount + 1;
+	}
+
+	/**
+	 * Set a new drop
+	 */
+	function handleNewDrop(
+		uint128 _dropCount,
+		address[] memory _reservedAddresses
+	) public onlyOwner {
 		dropCount = _dropCount;
+		dropSize = _dropCount;
+		currentDropReserveCount = 0;
+		currentDropReserveIndex = currentDropReserveIndex + 1;
+
+		for (uint128 i = 0; i < _reservedAddresses.length; i++) {
+			reserveForCurrentDrop(_reservedAddresses[i]);
+		}
+	}
+
+	/**
+	 * Escape hatch to update reveal index
+	 */
+	function handleReveal(uint128 _revealIndex) public onlyOwner {
+		revealIndex = _revealIndex;
 	}
 
 	/**
 	 * Escape hatch to update price.
 	 */
-	function setPrice(uint128 _listPrice) public onlyOwner {
+	function setPresalePrice(uint128 _presalePrice) public onlyOwner {
+		presalePrice = _presalePrice;
+	}
+
+	/**
+	 * Escape hatch to update list price.
+	 */
+	function setListPrice(uint128 _listPrice) public onlyOwner {
 		listPrice = _listPrice;
 	}
 
@@ -65,20 +132,15 @@ contract AerialIcons is ERC721, Ownable, Pausable {
 		baseURI = _baseURI;
 	}
 
-
 	/**
-	 * Update sweet baby cooper's address in the event of an emergency
+	 * Update a flight passes redemption URI.
 	 */
-	function setSweetCooper(address _sweetCooper) public {
-		require(msg.sender == sweetAndy, "NOT_ANDY");
-		sweetCooper = _sweetCooper;
-	}
-
-	/**
-	 * Add a user's address to premint mapping for a specific token.
-	 */
-	function setPremintAddresses(address[] memory _premintAddresses) public onlyOwner {
-		premintAddresses = _premintAddresses;
+	function setFlightPassRedemptionURI(
+		uint256 _tokenId,
+		string memory _redemptionURI
+	) public onlyOwner {
+		require(flightPassMap[_tokenId].claimed, "FLIGHT_PASS_CLAIMED");
+		flightPassRedemptionMap[_tokenId] = _redemptionURI;
 	}
 
 	/**
@@ -86,11 +148,14 @@ contract AerialIcons is ERC721, Ownable, Pausable {
 	 */
 	function setFlightPassIndex(uint256 _tokenId) public onlyOwner {
 		require(!flightPassMap[_tokenId].claimed, "FLIGHT_PASS_CLAIMED");
+		flightPassMap[_tokenId] = FlightPass({ exists: true, claimed: false });
+	}
 
-		flightPassMap[_tokenId] = FlightPass({
-			claimed: false,
-			exists: true
-		});
+	/**
+	 * Update sweet baby andy's address in the event of an emergency
+	 */
+	function setSweetAndy(address _sweetAndy) public onlyOwner {
+		sweetAndy = _sweetAndy;
 	}
 
 	/*
@@ -103,7 +168,7 @@ contract AerialIcons is ERC721, Ownable, Pausable {
 		uint256 balance = address(this).balance;
 
 		// Send devs 4.95%
-		(bool success, ) = sweetCooper.call{ value: (balance * 5) / 100 }("");
+		(bool success, ) = sweetAndy.call{ value: (balance * 5) / 100 }("");
 		require(success, "FAILED_SEND_DEV");
 
 		// Send owner remainder
@@ -111,52 +176,227 @@ contract AerialIcons is ERC721, Ownable, Pausable {
 		require(success, "FAILED_SEND_OWNER");
 	}
 
+	/**
+	 * Add a single address to the reserve list.
+	 */
+	function addPresaleAddress(address _address) public onlyOwner {
+		require(
+			presale.addressMapping[_address],
+			"PRESALE_ADDRESS_ALREADY_EXISTS"
+		);
+
+		presale.addressMapping[_address] = true;
+		presale.addressCount = presale.addressCount + 1;
+	}
+
+	/**
+	 * Add addresses to presale.
+	 */
+	function setPresaleAddresses(address[] memory _addresses) public onlyOwner {
+		for (uint128 i = 0; i < _addresses.length; i++) {
+			// Do not incrememnt counter if this address already exists
+			if (!presale.addressMapping[_addresses[i]]) {
+				presale.addressMapping[_addresses[i]] = true;
+				presale.addressCount = presale.addressCount + 1;
+			}
+		}
+	}
+
+	/**
+	 * Remove from presale.
+	 */
+	function removePresaleAddress(address _address) public onlyOwner {
+		require(presale.addressMapping[_address], "RESERVE_ADDRESS_DNE");
+		presale.addressMapping[_address] = false;
+		presale.addressCount = presale.addressCount - 1;
+	}
+
+	/**
+	 * Add a single address to the allow list.
+	 */
+	function addAllowListAddress(address _address) public onlyOwner {
+		require(
+			allowList.addressMapping[_address],
+			"PRESALE_ADDRESS_ALREADY_EXISTS"
+		);
+
+		allowList.addressMapping[_address] = true;
+		allowList.addressCount = allowList.addressCount + 1;
+	}
+
+	/**
+	 * Add addresses to allow list.
+	 */
+	function setAllowListAddresses(address[] memory _addresses)
+		public
+		onlyOwner
+	{
+		for (uint128 i = 0; i < _addresses.length; i++) {
+			// Do not incrememnt counter if this address already exists
+			if (!allowList.addressMapping[_addresses[i]]) {
+				allowList.addressMapping[_addresses[i]] = true;
+				allowList.addressCount = allowList.addressCount + 1;
+			}
+		}
+	}
+
+	/**
+	 * Remove from allow list.
+	 */
+	function removeAllowListAddress(address _address) public onlyOwner {
+		require(allowList.addressMapping[_address], "RESERVE_ADDRESS_DNE");
+		allowList.addressMapping[_address] = false;
+		allowList.addressCount = allowList.addressCount - 1;
+	}
+
+	/**
+	 * Add a single address to the hookup.
+	 */
+	function addHookupAddress(address _address, uint256 _price)
+		public
+		onlyOwner
+	{
+		require(
+			!hookup.addressPriceMapping[_address].exists,
+			"HOOKUP_ADDRESS_ALREADY_EXISTS"
+		);
+
+		hookup.addressPriceMapping[_address] = Hookup({
+			exists: true,
+			price: _price
+		});
+		hookup.addressCount = hookup.addressCount + 1;
+	}
+
+	/**
+	 * Add addresses to hookup.
+	 * A bit wacky, but addresses and prices are parallel arrays that
+	 * compose into matching key-value pairs.
+	 */
+	function setHookupAddresses(
+		address[] memory _addresses,
+		uint256[] memory _prices
+	) public onlyOwner {
+		require(
+			_addresses.length == _prices.length,
+			"HOOKUP_ARRAYS_MUST_BE_PARALLEL"
+		);
+
+		for (uint128 i = 0; i < _addresses.length; i++) {
+			// Do not incrememnt counter if this address already exists
+			if (!hookup.addressPriceMapping[_addresses[i]].exists) {
+				hookup.addressPriceMapping[_addresses[i]] = Hookup({
+					exists: true,
+					price: _prices[i]
+				});
+				hookup.addressCount = hookup.addressCount + 1;
+			}
+		}
+	}
+
+	/**
+	 * Remove from hookup list
+	 */
+	function removeFromHookup(address _address) public onlyOwner {
+		require(
+			hookup.addressPriceMapping[_address].exists,
+			"HOOKUP_ADDRESS_DNE"
+		);
+
+		delete hookup.addressPriceMapping[_address];
+		hookup.addressCount = hookup.addressCount - 1;
+	}
+
+	function getTotalReserved() private view returns (uint256) {
+		return (presale.addressCount +
+			allowList.addressCount +
+			hookup.addressCount);
+	}
+
+	function isAddressReserved(address _address) private view returns (bool) {
+		return (presale.addressMapping[_address] ||
+			allowList.addressMapping[_address] ||
+			hookup.addressPriceMapping[_address].exists);
+	}
+
 	// Minting
 	/*------------------------------------*/
+
+	function handleDropCount() private {
+		dropCount = dropCount - 1;
+		if (dropCount == 0) {
+			revealIndex = revealIndex + dropSize;
+		}
+	}
 
 	/**
 	 * Mint boarding pass
 	 */
 	function handleBoardingPass() private {
 		_safeMint(msg.sender, boardingPassCounter.current());
+
+		handleDropCount();
 		boardingPassCounter.increment();
 	}
-
 
 	/**
 	 * Mint flight pass
 	 */
 	function handleFlightPass() private {
-		uint256 nextTokenId = boardingPassCounter.current();
-		FlightPass memory flightPass = flightPassMap[nextTokenId];
+		_safeMint(msg.sender, MAX_SUPPLY - (flightPassCounter.current() + 1));
 
-		require(flightPass.exists, "FLIGHT_PASS_TOKEN_DNE");
-		require(!flightPass.claimed, "FLIGHT_PASS_TOKEN_CLAIMED");
-
-		_safeMint(msg.sender, nextTokenId);
-
-		boardingPassCounter.increment();
 		flightPassCounter.increment();
-		flightPassMap[nextTokenId].claimed = true;
+		flightPassMap[boardingPassCounter.current()].claimed = true;
+		handleDropCount();
 	}
 
 	/**
 	 * Mint
 	 */
-	function publicMint() public whenNotPaused payable {
-		require(listPrice <= msg.value, "LOW_ETH");
-		require(dropCount > 0, "DROP_COMPLETE");
-		require(boardingPassCounter.current() < MAX_SUPPLY, "MAX_SUPPLY_REACHED");
+	function mint(uint128 purchaseCount) public payable {
+		uint256 finalPrice = listPrice;
 
-		uint256 nextTokenId = boardingPassCounter.current();
+		if (hookup.addressPriceMapping[msg.sender].exists) {
+			finalPrice = hookup.addressPriceMapping[msg.sender].price;
+		} else if (presale.addressMapping[msg.sender]) {
+			finalPrice = presalePrice;
+		}
 
-		if (
-			flightPassMap[nextTokenId].exists &&
-			!flightPassMap[nextTokenId].claimed
-		) {
-			handleFlightPass();
-		} else {
-			handleBoardingPass();
+		require(
+			msg.value >= finalPrice + (listPrice * (purchaseCount - 1)),
+			"LOW_ETH"
+		);
+
+		require(
+			(currentDropReserve[currentDropReserveIndex][msg.sender] &&
+				dropCount + 1 >= purchaseCount + currentDropReserveCount) ||
+				dropCount >= (purchaseCount + currentDropReserveCount),
+			"DROP_SUPPLY_REACHED"
+		);
+		require(
+			isAddressReserved(msg.sender) ||
+				boardingPassCounter.current() +
+					getTotalReserved() +
+					purchaseCount -
+					1 <
+				MAX_SUPPLY,
+			"MAX_SUPPLY_REACHED"
+		);
+
+		if (currentDropReserve[currentDropReserveIndex][msg.sender]) {
+			delete currentDropReserve[currentDropReserveIndex][msg.sender];
+			currentDropReserveCount = currentDropReserveCount - 1;
+		}
+
+		for (uint256 i = 0; i < purchaseCount; i++) {
+			uint256 nextTokenId = boardingPassCounter.current();
+			FlightPass memory flightPass = flightPassMap[nextTokenId];
+
+			if (flightPass.exists && !flightPass.claimed) {
+				handleFlightPass();
+			} else {
+				handleBoardingPass();
+			}
 		}
 	}
 
@@ -167,7 +407,7 @@ contract AerialIcons is ERC721, Ownable, Pausable {
 	 * Get total token supply
 	 */
 	function totalSupply() public view returns (uint256) {
-		return boardingPassCounter.current();
+		return boardingPassCounter.current() + flightPassCounter.current();
 	}
 
 	/**
@@ -179,16 +419,21 @@ contract AerialIcons is ERC721, Ownable, Pausable {
 		override
 		returns (string memory)
 	{
+		console.log(_tokenId);
+		console.log(_exists(_tokenId));
+
 		require(_exists(_tokenId), "TOKEN_DNE");
 
-		if (_tokenId > revealIndex) {
+		if (_tokenId >= MAX_SUPPLY - flightPassCounter.current()) {
+			if (bytes(flightPassRedemptionMap[_tokenId]).length != 0) {
+				return flightPassRedemptionMap[_tokenId];
+			} else {
+				return string(abi.encodePacked(baseURI, "flight_pass"));
+			}
+		} else if (_tokenId + 1 > revealIndex) {
 			return string(abi.encodePacked(baseURI, "boarding_pass"));
-		} else if (flightPassMap[_tokenId].exists) {
-			return string(abi.encodePacked(baseURI, "flight_pass"));
 		}
 
-		return string(
-			abi.encodePacked(baseURI, Strings.toString(_tokenId - flightPassCounter.current()))
-		);
+		return string(abi.encodePacked(baseURI, Strings.toString(_tokenId)));
 	}
 }

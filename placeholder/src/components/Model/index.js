@@ -3,11 +3,11 @@ import { useGLTF } from "@react-three/drei";
 import { useFrame } from "react-three-fiber";
 
 export const Model = (props) => {
-	const { scene } = useGLTF("/boardingPass.glb");
+	const { scene } = useGLTF("/flightPass.glb");
 	const modelRef = useRef();
 
 	useFrame(({ clock }) => {
-		modelRef.current.rotation.y = clock.getElapsedTime() / 10;
+		modelRef.current.rotation.y = clock.getElapsedTime() / 6;
 	});
 
 	return <primitive ref={modelRef} object={scene} />;

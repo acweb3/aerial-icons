@@ -10,11 +10,12 @@ export const Viewer = ({ children }) => {
 				height: "100vh",
 			}}
 			pixelRatio={[1, 1]}
-			camera={{ position: [10, 0, 10], fov: 1 }}
+			camera={{ position: [10, 0, 10], fov: 10 }}
 		>
-			<color attach="background" args={["black"]} />
-			<ambientLight intensity={0} />
+			<color attach="background" args={["red"]} />
+			{/* <ambientLight intensity={1} /> */}
 			<Suspense fallback={null}>{children}</Suspense>
+			<OrbitControls />
 		</Canvas>
 	);
 };
